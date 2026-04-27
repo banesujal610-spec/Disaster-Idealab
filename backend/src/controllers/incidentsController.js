@@ -8,11 +8,15 @@ exports.reportIncident = async (req, res) => {
     const latitude = location?.lat || location?.latitude || 0;
     const longitude = location?.lng || location?.longitude || 0;
 
+    // Map 'critical' to 'high' to satisfy database CHECK constraints
+    let validSeverity = severity || 'medium';
+    if (validSeverity === 'critical') validSeverity = 'high';
+
     const { data, error } = await supabase
       .from('incidents')
       .insert([{
         incident_type: type,
-        severity: severity || 'medium',
+        severity: validSeverity,
         description,
         latitude,
         longitude,

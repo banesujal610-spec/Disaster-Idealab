@@ -30,6 +30,41 @@ export default function MissionMode() {
   )
   const [missionStatus, setMissionStatus] = useState('en_route')
   const [elapsed, setElapsed] = useState(0)
+  const [teamPos, setTeamPos] = useState([incident?.location?.lat + 0.005, incident?.location?.lng - 0.003])
+  const [incidentAddress, setIncidentAddress] = useState(incident?.location?.address || 'Fetching address...')
+  const [teamAddress, setTeamAddress] = useState('Fetching unit location...')
+
+  useEffect(() => {
+    if (!incident) return;
+
+    // Try to get real-time location for the team
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setTeamPos([pos.coords.latitude, pos.coords.longitude])
+      })
+    }
+    
+    const fetchAddresses = async () => {
+      try {
+        // Reverse geocode incident location
+        const res1 = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${incident.location.lat}&lon=${incident.location.lng}`);
+        const data1 = await res1.json();
+        setIncidentAddress(data1.display_name || 'Location provided');
+
+        // Wait 1 second to respect Nominatim rate limits (1 req/sec)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Reverse geocode team location
+        const res2 = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${teamPos[0]}&lon=${teamPos[1]}`);
+        const data2 = await res2.json();
+        setTeamAddress(data2.display_name || 'Current unit location');
+      } catch (error) {
+        console.error("Geocoding failed:", error);
+      }
+    };
+
+    fetchAddresses();
+  }, [incident])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -59,7 +94,6 @@ export default function MissionMode() {
   }
 
   const center = [incident.location.lat, incident.location.lng]
-  const teamPos = [incident.location.lat + 0.005, incident.location.lng - 0.003]
   const routePath = [teamPos, center]
 
   const missionSteps = [
@@ -120,14 +154,19 @@ export default function MissionMode() {
             />
             <Marker position={center} icon={incidentIcon}>
               <Popup>
-                <div>
+                <div className="max-w-[200px]">
                   <h3 className="font-bold">{incident.type}</h3>
-                  <p className="text-xs text-gray-400">{incident.location.address}</p>
+                  <p className="text-xs text-gray-700 mt-1 leading-tight">{incidentAddress}</p>
                 </div>
               </Popup>
             </Marker>
             <Marker position={teamPos} icon={teamIcon}>
-              <Popup><div>Your Unit</div></Popup>
+              <Popup>
+                <div className="max-w-[200px]">
+                  <h3 className="font-bold">Your Unit</h3>
+                  <p className="text-xs text-gray-700 mt-1 leading-tight">{teamAddress}</p>
+                </div>
+              </Popup>
             </Marker>
             <Polyline
               positions={routePath}
@@ -142,10 +181,20 @@ export default function MissionMode() {
           <div className="p-5 border-b border-white/5">
             <h2 className="text-lg font-bold text-white mb-3">{incident.type} Incident</h2>
             <p className="text-sm text-dark-300 mb-4">{incident.description}</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-dark-400">
-                <FiMapPin size={14} />
-                {incident.location.address}
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 text-sm text-dark-400">
+                <FiMapPin size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
+                <div>
+                  <p className="text-xs font-semibold text-white">Incident Address</p>
+                  <p className="text-xs leading-relaxed">{incidentAddress}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-dark-400">
+                <FiNavigation size={16} className="mt-0.5 flex-shrink-0 text-blue-400" />
+                <div>
+                  <p className="text-xs font-semibold text-white">Current Unit Location</p>
+                  <p className="text-xs leading-relaxed">{teamAddress}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2 text-sm text-dark-400">
                 <FiClock size={14} />

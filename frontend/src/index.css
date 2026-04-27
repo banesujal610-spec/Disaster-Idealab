@@ -52,11 +52,11 @@
     @apply bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] shadow-[0_8px_32px_0_rgba(0,0,0,0.8)];
   }
   .glass-card {
-    @apply bg-white/[0.02] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_0_rgba(0,0,0,0.6)] rounded-2xl transition-all duration-500 relative overflow-hidden;
+    @apply bg-white/[0.02] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_0_rgba(0,0,0,0.6)] rounded-2xl transition-all duration-500 relative;
   }
   .glass-card::before {
     content: '';
-    @apply absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent opacity-0 transition-opacity duration-500 pointer-events-none;
+    @apply absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent opacity-0 transition-opacity duration-500 pointer-events-none rounded-2xl;
   }
   .glass-card:hover::before {
     @apply opacity-100;
@@ -141,5 +141,30 @@
 }
 .leaflet-control-attribution a {
   color: rgba(255,255,255,0.4) !important;
+}
+
+/* Facility marker icons - remove default leaflet background */
+.facility-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Popup styling for facility info */
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  line-height: 1.5 !important;
+}
+.leaflet-popup-content a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+.leaflet-popup-close-button {
+  color: rgba(255,255,255,0.5) !important;
+  font-size: 18px !important;
+  top: 6px !important;
+  right: 8px !important;
+}
+.leaflet-popup-close-button:hover {
+  color: #fff !important;
 }
 

@@ -12,8 +12,6 @@ const navItems = [
   { path: '/command/incidents', icon: FiAlertCircle, label: 'Live Incidents' },
   { path: '/command/map', icon: FiMap, label: 'Map View' },
   { path: '/command/tasks', icon: FiCheckSquare, label: 'Assigned Tasks' },
-  { path: '/command/teams', icon: FiUsers, label: 'Teams' },
-  { path: '/command/resources', icon: FiPackage, label: 'Resources' },
   { path: '/command/alerts', icon: FiBell, label: 'Alerts' },
 ]
 

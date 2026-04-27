@@ -134,6 +134,8 @@ export default function App() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="teams" element={<TeamsPage />} />
+            <Route path="resources" element={<ResourcesPage />} />
           </Route>
 
           <Route
@@ -148,8 +150,6 @@ export default function App() {
             <Route path="incidents" element={<IncidentManagement />} />
             <Route path="map" element={<LiveMap />} />
             <Route path="tasks" element={<AssignedTasks />} />
-            <Route path="teams" element={<TeamsPage />} />
-            <Route path="resources" element={<ResourcesPage />} />
             <Route path="alerts" element={<AlertsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

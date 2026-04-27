@@ -1,21 +1,27 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { addIncident } from '../../store/incidentsSlice'
 import api from '../../services/api'
 import { toast } from 'react-hot-toast'
-import { INCIDENT_TYPES, simulateAIAnalysis, generateIncidentId } from '../../services/mockData'
+import { INCIDENT_TYPES } from '../../services/mockData'
+import { analyzeDisasterImage } from '../../utils/imageAnalysis'
+import { getNearestByType } from '../../utils/nearbyFacilities'
 import AIAssistPanel from './AIAssistPanel'
 import LocationModule from './LocationModule'
 import SubmissionSuccess from './SubmissionSuccess'
-import { FiUpload, FiX, FiImage, FiSend, FiArrowLeft, FiPhone } from 'react-icons/fi'
+import CallModal from './CallModal'
+import { FiUpload, FiX, FiImage, FiSend, FiArrowLeft, FiPhone, FiChevronDown, FiChevronUp, FiCamera } from 'react-icons/fi'
 
 export default function IncidentReport() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const [step, setStep] = useState(0) // 0: form, 1: success
   const [submittedIncident, setSubmittedIncident] = useState(null)
+  const [showUpload, setShowUpload] = useState(false)
+  const [nearestFacilities, setNearestFacilities] = useState({})
+  const [callModal, setCallModal] = useState({ isOpen: false, phone: '', name: '', type: '', distance: null, address: '' })
 
   const [formData, setFormData] = useState({
     type: '',
@@ -29,26 +35,43 @@ export default function IncidentReport() {
   const [aiLoading, setAiLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  // Handle facilities loaded from LocationModule
+  const handleFacilitiesLoaded = useCallback((facilities) => {
+    const nearest = getNearestByType(facilities)
+    setNearestFacilities(nearest)
+  }, [])
+
+  // AI-powered image analysis using color distribution
+  const runImageAnalysis = useCallback(async (imageDataUrl) => {
+    setAiLoading(true)
+    try {
+      const analysis = await analyzeDisasterImage(imageDataUrl)
+      setAiAnalysis(analysis)
+      // We explicitly DO NOT auto-set formData.type here based on AI analysis
+      // to ensure the user always manually confirms or selects the incident type.
+    } catch (err) {
+      console.error('AI analysis failed:', err)
+      toast.error('Image analysis failed. Please select incident type manually.')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [])
+
   const handleImageUpload = useCallback((e) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Image size cannot exceed 10MB')
+        return
+      }
       const reader = new FileReader()
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, imageFile: file, imagePreview: reader.result }))
-        // Simulate AI analysis
-        setAiLoading(true)
-        setTimeout(() => {
-          const detectedType = INCIDENT_TYPES[Math.floor(Math.random() * 5)]
-          simulateAIAnalysis(detectedType).then(analysis => {
-            setAiAnalysis(analysis)
-            setAiLoading(false)
-            setFormData(prev => ({ ...prev, type: detectedType }))
-          })
-        }, 800)
+        runImageAnalysis(reader.result)
       }
       reader.readAsDataURL(file)
     }
-  }, [])
+  }, [runImageAnalysis])
 
   const handleRemoveImage = () => {
     setFormData(prev => ({ ...prev, imageFile: null, imagePreview: null }))
@@ -59,25 +82,25 @@ export default function IncidentReport() {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
     if (file && file.type.startsWith('image/')) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Image size cannot exceed 10MB')
+        return
+      }
       const reader = new FileReader()
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, imageFile: file, imagePreview: reader.result }))
-        setAiLoading(true)
-        setTimeout(() => {
-          const detectedType = INCIDENT_TYPES[Math.floor(Math.random() * 5)]
-          simulateAIAnalysis(detectedType).then(analysis => {
-            setAiAnalysis(analysis)
-            setAiLoading(false)
-            setFormData(prev => ({ ...prev, type: detectedType }))
-          })
-        }, 800)
+        runImageAnalysis(reader.result)
       }
       reader.readAsDataURL(file)
     }
-  }, [])
+  }, [runImageAnalysis])
 
   const handleLocationSelect = (location) => {
     setFormData(prev => ({ ...prev, location }))
+  }
+
+  const openCallModal = (phone, name, type, distance, address) => {
+    setCallModal({ isOpen: true, phone, name: name || type, type, distance, address: address || '' })
   }
 
   const handleSubmit = async () => {
@@ -110,8 +133,49 @@ export default function IncidentReport() {
     return <SubmissionSuccess incident={submittedIncident} />
   }
 
+  // Emergency call cards config
+  const emergencyCards = [
+    {
+      key: 'police',
+      label: 'Police',
+      defaultNumber: '100',
+      color: 'blue',
+      nearestFacility: nearestFacilities.police,
+    },
+    {
+      key: 'fire_station',
+      label: 'Fire Brigade',
+      defaultNumber: '101',
+      color: 'red',
+      nearestFacility: nearestFacilities.fire_station,
+    },
+    {
+      key: 'hospital',
+      label: 'Ambulance',
+      defaultNumber: '102',
+      color: 'green',
+      nearestFacility: nearestFacilities.hospital,
+    },
+    {
+      key: 'disaster',
+      label: 'Disaster Response',
+      defaultNumber: '108',
+      color: 'orange',
+      nearestFacility: null,
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-dark-950">
+      <CallModal
+        isOpen={callModal.isOpen}
+        onClose={() => setCallModal(prev => ({ ...prev, isOpen: false }))}
+        phone={callModal.phone}
+        name={callModal.name}
+        type={callModal.type}
+        distance={callModal.distance}
+        address={callModal.address}
+      />
       {/* Header */}
       <div className="sticky top-0 z-30 bg-dark-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -136,79 +200,123 @@ export default function IncidentReport() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Quick Call System */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
-            <a href="tel:100" className="glass-card p-4 flex flex-col items-center justify-center text-center hover:bg-blue-500/10 hover:border-blue-500/30 transition-all group">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mb-2 group-hover:glow-blue transition-all">
-                <FiPhone className="text-blue-400" />
-              </div>
-              <span className="font-bold text-white text-sm">Police</span>
-              <span className="text-blue-400 font-mono text-xs mt-1 bg-blue-500/10 px-2 py-0.5 rounded">100</span>
-            </a>
-            <a href="tel:101" className="glass-card p-4 flex flex-col items-center justify-center text-center hover:bg-red-500/10 hover:border-red-500/30 transition-all group">
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center mb-2 group-hover:glow-red transition-all">
-                <FiPhone className="text-red-400" />
-              </div>
-              <span className="font-bold text-white text-sm">Fire Brigade</span>
-              <span className="text-red-400 font-mono text-xs mt-1 bg-red-500/10 px-2 py-0.5 rounded">101</span>
-            </a>
-            <a href="tel:102" className="glass-card p-4 flex flex-col items-center justify-center text-center hover:bg-green-500/10 hover:border-green-500/30 transition-all group">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mb-2 group-hover:glow-green transition-all">
-                <FiPhone className="text-green-400" />
-              </div>
-              <span className="font-bold text-white text-sm">Ambulance</span>
-              <span className="text-green-400 font-mono text-xs mt-1 bg-green-500/10 px-2 py-0.5 rounded">102</span>
-            </a>
-            <a href="tel:108" className="glass-card p-4 flex flex-col items-center justify-center text-center hover:bg-orange-500/10 hover:border-orange-500/30 transition-all group">
-              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center mb-2 transition-all shadow-[0_0_15px_rgba(249,115,22,0.5)] group-hover:shadow-[0_0_25px_rgba(249,115,22,0.8)] border border-orange-500/20">
-                <FiPhone className="text-orange-400" />
-              </div>
-              <span className="font-bold text-white text-sm">Disaster Response</span>
-              <span className="text-orange-400 font-mono text-xs mt-1 bg-orange-500/10 px-2 py-0.5 rounded">108</span>
-            </a>
+          {/* Emergency Call Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+            {emergencyCards.map((card) => {
+              const nf = card.nearestFacility
+              const phoneNumber = nf?.phone || card.defaultNumber
+              const facilityName = nf?.name || null
+              const distance = nf?.distance || null
+
+              return (
+                <button 
+                  key={card.key} 
+                  onClick={() => openCallModal(phoneNumber, facilityName, card.label, distance, nf?.address)}
+                  className={`glass-card p-4 flex flex-col items-center justify-center text-center hover:bg-${card.color}-500/10 hover:border-${card.color}-500/30 transition-all group`}
+                >
+                  <div className={`w-10 h-10 rounded-full bg-${card.color}-500/20 flex items-center justify-center mb-2 group-hover:shadow-[0_0_20px_rgba(var(--${card.color}),0.4)] transition-all`}>
+                    <FiPhone className={`text-${card.color}-400`} />
+                  </div>
+                  <span className="font-bold text-white text-sm">{card.label}</span>
+                  {facilityName && facilityName !== card.label && (
+                    <span className="text-dark-400 text-[10px] mt-0.5 line-clamp-1 max-w-full px-1">{facilityName}</span>
+                  )}
+                  <span className={`text-${card.color}-400 font-mono text-xs mt-1 bg-${card.color}-500/10 px-2 py-0.5 rounded`}>
+                    {phoneNumber}
+                  </span>
+                  {distance && (
+                    <span className="text-dark-500 text-[10px] mt-0.5">
+                      {distance < 1000 ? `${distance}m away` : `${(distance / 1000).toFixed(1)}km`}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Image Upload */}
+          {/* Upload Evidence - Optional with toggle */}
           <div className="glass-card">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <FiImage className="text-primary-400" />
-              Upload Evidence
-            </h3>
+            <button
+              onClick={() => setShowUpload(!showUpload)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <FiImage className="text-primary-400" />
+                Upload Evidence
+                <span className="text-xs font-normal text-dark-500 bg-dark-800/50 px-2 py-0.5 rounded-full">Optional</span>
+              </h3>
+              {showUpload ? (
+                <FiChevronUp className="text-dark-400" />
+              ) : (
+                <FiChevronDown className="text-dark-400" />
+              )}
+            </button>
 
-            {!formData.imagePreview ? (
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-dark-600 rounded-xl p-8 text-center hover:border-primary-500/50 transition-colors cursor-pointer"
-              >
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label htmlFor="image-upload" className="cursor-pointer">
-                  <FiUpload className="mx-auto text-3xl text-dark-400 mb-3" />
-                  <p className="text-dark-300 text-sm">Drag & drop or click to upload</p>
-                  <p className="text-dark-500 text-xs mt-1">Images and videos accepted</p>
-                </label>
-              </div>
-            ) : (
-              <div className="relative">
-                <img
-                  src={formData.imagePreview}
-                  alt="Preview"
-                  className="w-full h-48 object-cover rounded-xl"
-                />
-                <button
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-dark-900/80 flex items-center justify-center text-white hover:bg-red-500/80 transition-colors"
+            <AnimatePresence>
+              {showUpload && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
                 >
-                  <FiX size={16} />
-                </button>
-              </div>
-            )}
+                  <div className="mt-4">
+                    {!formData.imagePreview ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="border-2 border-dashed border-dark-600 rounded-xl p-6 text-center hover:border-primary-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="camera-upload"
+                          />
+                          <label htmlFor="camera-upload" className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                            <FiCamera className="text-3xl text-dark-400 mb-3" />
+                            <p className="text-dark-300 font-medium">Click Picture</p>
+                            <p className="text-dark-500 text-xs mt-1">Open device camera</p>
+                          </label>
+                        </div>
+                        <div
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={handleDrop}
+                          className="border-2 border-dashed border-dark-600 rounded-xl p-6 text-center hover:border-primary-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center"
+                        >
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="gallery-upload"
+                          />
+                          <label htmlFor="gallery-upload" className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                            <FiUpload className="text-3xl text-dark-400 mb-3" />
+                            <p className="text-dark-300 font-medium">Upload Image</p>
+                            <p className="text-dark-500 text-xs mt-1">From gallery (Up to 10MB)</p>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <img
+                          src={formData.imagePreview}
+                          alt="Preview"
+                          className="w-full h-48 object-cover rounded-xl"
+                        />
+                        <button
+                          onClick={handleRemoveImage}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-dark-900/80 flex items-center justify-center text-white hover:bg-red-500/80 transition-colors"
+                        >
+                          <FiX size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* AI Analysis */}
@@ -218,8 +326,17 @@ export default function IncidentReport() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
+                className="relative group"
               >
                 <AIAssistPanel analysis={aiAnalysis} loading={aiLoading} />
+                {!aiLoading && aiAnalysis && (
+                  <button
+                    onClick={() => setFormData(prev => ({ ...prev, type: aiAnalysis.type }))}
+                    className="absolute top-4 right-4 bg-primary-500 hover:bg-primary-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-lg opacity-0 group-hover:opacity-100"
+                  >
+                    APPLY SUGGESTION
+                  </button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -277,7 +394,10 @@ export default function IncidentReport() {
           {/* Location */}
           <div className="glass-card" style={{ overflow: 'visible' }}>
             <h3 className="text-lg font-semibold text-white mb-4">Location</h3>
-            <LocationModule onLocationSelect={handleLocationSelect} />
+            <LocationModule
+              onLocationSelect={handleLocationSelect}
+              onFacilitiesLoaded={handleFacilitiesLoaded}
+            />
           </div>
 
           {/* Submit */}

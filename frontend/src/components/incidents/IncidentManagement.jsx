@@ -18,6 +18,9 @@ export default function IncidentManagement() {
   const [showFilters, setShowFilters] = useState(false)
 
   const filteredIncidents = incidents.filter(i => {
+    // Automatically hide completed/resolved incidents to keep the UI clean
+    if (filters.status === 'all' && i.status === 'resolved') return false
+    
     if (filters.severity !== 'all' && i.severity !== filters.severity) return false
     if (filters.type !== 'all' && i.type !== filters.type) return false
     if (filters.status !== 'all' && i.status !== filters.status) return false

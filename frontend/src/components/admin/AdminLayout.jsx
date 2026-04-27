@@ -1,6 +1,6 @@
-import { Outlet, Navigate, useNavigate } from 'react-router-dom'
+import { Outlet, Navigate, useNavigate, NavLink } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { FiLogOut, FiShield, FiMap, FiList } from 'react-icons/fi'
+import { FiLogOut, FiShield, FiMap, FiList, FiUsers, FiPackage } from 'react-icons/fi'
 import { logout } from '../../store/authSlice'
 import { motion } from 'framer-motion'
 
@@ -33,13 +33,27 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          <button 
-            onClick={() => navigate('/admin/dashboard')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-500/10 text-purple-400 font-medium"
+          <NavLink 
+            to="/admin/dashboard"
+            className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive ? 'bg-purple-500/10 text-purple-400' : 'text-dark-400 hover:bg-dark-800 hover:text-white'}`}
           >
             <FiList className="text-lg" />
             Global Incidents
-          </button>
+          </NavLink>
+          <NavLink 
+            to="/admin/teams"
+            className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive ? 'bg-purple-500/10 text-purple-400' : 'text-dark-400 hover:bg-dark-800 hover:text-white'}`}
+          >
+            <FiUsers className="text-lg" />
+            Emergency Teams
+          </NavLink>
+          <NavLink 
+            to="/admin/resources"
+            className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive ? 'bg-purple-500/10 text-purple-400' : 'text-dark-400 hover:bg-dark-800 hover:text-white'}`}
+          >
+            <FiPackage className="text-lg" />
+            Resource Management
+          </NavLink>
         </nav>
 
         <div className="p-4 border-t border-dark-800">
